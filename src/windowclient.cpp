@@ -7,12 +7,22 @@
 extern WindowClient *w;
 
 #include "protocole.h"
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/shm.h>
+#include <signal.h>
+#include <cstring>
 
 int idQ, idShm;
 #define TIME_OUT 120
 int timeOut = TIME_OUT;
+int SERVEUR = 1;
+char* pShm;
 
 void handlerSIGUSR1(int sig);
+void handlerSIGUSR2(int sig);
+void handlerSIGALRM(int sig);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,15 +35,63 @@ WindowClient::WindowClient(QWidget *parent):QMainWindow(parent),ui(new Ui::Windo
 
     // Recuperation de l'identifiant de la file de messages
     fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la file de messages\n",getpid());
+    idQ = msgget(CLE, IPC_CREAT | 0666);
+    if (idQ == -1)
+    {
+      perror("(CLIENT) Erreur msgget");
+      exit(EXIT_FAILURE);
+    }
 
     // Recuperation de l'identifiant de la mémoire partagée
-    fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la mémoire partagée\n",getpid());
+ /*   fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la mémoire partagée\n",getpid());
+    if ((idShm = shmget(CLE, 0,0)) == -1)
+    {
+      perror("(PUBLICITE) Erreur lors de la récupération de l'id de la mémoire partagée");
+      exit(1);
+    }
 
     // Attachement à la mémoire partagée
+    if ((pShm = (char *)shmat(idShm, NULL, 0)) == (char *) - 1)
+    {
+      perror("(PUBLICITE) Erreur lors de l'attachement de la mémoire partagée");
+      exit(1);
+    }*/
 
     // Armement des signaux
+    struct sigaction A;
+    A.sa_handler = handlerSIGUSR1;
+    sigemptyset(&A.sa_mask);
+    A.sa_flags = 0;
+    if (sigaction(SIGUSR1, &A, NULL) == -1)
+    {
+      perror("Erreur d'armement de SIGUSR1");
+      exit(1);
+    }
+
+    struct sigaction B;
+    B.sa_handler = handlerSIGUSR2;
+    sigemptyset(&B.sa_mask);
+    B.sa_flags = 0;
+    if (sigaction(SIGUSR2, &B, NULL) == -1)
+    {
+      perror("Erreur d'armement de SIGUSR2");
+      exit(1);
+    }
 
     // Envoi d'une requete de connexion au serveur
+
+    MESSAGE connexion;
+    connexion.type = SERVEUR;
+    connexion.requete = CONNECT;
+    connexion.expediteur = getpid();
+
+    fprintf(stderr, "(CLIENT %d) Requete CONNECT envoyée\n", getpid());
+    if (msgsnd(idQ, &connexion, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    {
+      perror("(CLIENT) Erreur de send");
+      msgctl(idQ, IPC_RMID, NULL);
+      exit(1);
+    }
 }
 
 WindowClient::~WindowClient()
@@ -329,6 +387,18 @@ void WindowClient::dialogueErreur(const char* titre,const char* message)
 void WindowClient::closeEvent(QCloseEvent *event)
 {
     // TO DO
+    fprintf(stderr, "Arret du programme..");
+    MESSAGE m;
+    m.type = 1;
+    m.expediteur = getpid();
+    m.requete = DECONNECT;
+
+    if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    {
+      perror("(CLIENT) Erreur de send Deconnexion");
+      msgctl(idQ, IPC_RMID, NULL);
+      exit(1);
+    }
 
     QApplication::exit();
 }
@@ -338,13 +408,43 @@ void WindowClient::closeEvent(QCloseEvent *event)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void WindowClient::on_pushButtonLogin_clicked()
 {
-    // TO DO
 
+    MESSAGE login;
+    int nvch = isNouveauChecked();
+    login.type = SERVEUR;
+    login.expediteur = getpid();
+    login.requete = LOGIN;
+    strcpy(login.data2, getNom());
+    strcpy(login.texte, getMotDePasse());
+
+    if (nvch == 1)
+      strcpy(login.data1, "1");
+    else
+      strcpy(login.data1, "0");
+
+    if (msgsnd(idQ, &login, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    {
+      perror("(CLIENT) Erreur de send Login");
+      msgctl(idQ, IPC_RMID, NULL);
+      exit(1);
+    }
+    fprintf(stderr, "(CLIENT %d) Requete login envoyée\n", getpid());
 }
 
 void WindowClient::on_pushButtonLogout_clicked()
 {
     // TO DO
+    MESSAGE logout;
+    logout.type = SERVEUR;
+    logout.expediteur = getpid();
+    logout.requete = LOGOUT;
+    if (msgsnd(idQ, &logout, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    {
+      perror("(CLIENT) Erreur de send Logout");
+      msgctl(idQ, IPC_RMID, NULL);
+      exit(1);
+    }
+    fprintf(stderr, "Deconnection du pid : %d, Utilisateur: %s", getpid(), getNom());
     logoutOK();
 }
 
@@ -469,37 +569,109 @@ void WindowClient::on_checkBox5_clicked(bool checked)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void handlerSIGUSR1(int sig)
 {
-    MESSAGE m;
-    
-    // ...msgrcv(idQ,&m,...)
-    
+    MESSAGE m, login;
+    const char* nv;
+    const char* p;
+    int i;    
+
+    while (msgrcv(idQ, &m, sizeof(MESSAGE) - sizeof(long), getpid(),IPC_NOWAIT) != -1)
+    {
+      fprintf(stderr, " ---------------------\n");
+      fprintf(stderr, "Requete Recu : \n");
+      fprintf(stderr, " - Type de requète : %d \n", m.requete);
+      fprintf(stderr, " - Expediteur      : %d \n", m.expediteur); // pid
+      fprintf(stderr, " - Destinataire      : %ld \n", m.type);
+      fprintf(stderr, " - data1           : %s \n", m.data1); // 1 ou 0
+      fprintf(stderr, " - data2           : %s \n", m.data2); // nom
       switch(m.requete)
       {
         case LOGIN :
-                    if (strcmp(m.data1,"OK") == 0)
+                    if (strcmp(m.data1,"1") == 0)
                     {
                       fprintf(stderr,"(CLIENT %d) Login OK\n",getpid());
                       w->loginOK();
                       w->dialogueMessage("Login...",m.texte);
-                      // ...
+                      
+                      strcpy(login.data1, m.data1);
+                      login.type = SERVEUR;
+                      login.requete = CONSULT;
+                      login.expediteur = getpid();
+
+                      if (msgsnd(idQ, &login, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                      {
+                        perror("(CLIENT) Erreur d'envoie de la requete CONSULT");
+                        msgctl(idQ, IPC_RMID, NULL);
+                        exit(1);
+                      }
                     }
                     else w->dialogueErreur("Login...",m.texte);
                     break;
 
         case ADD_USER :
-                    // TO DO
+                    /*nv = m.data1;
+                    for (i = 1; i <= 5; i++)
+                    {
+                      p = w->getPersonneConnectee(i);
+                      if (strlen(p) == 0)
+                        break;
+                    }
+
+                    if (i <= 5)
+                    {
+                       w->setPersonneConnectee(i, nv); // ajoute le nom
+                       w->ajouteMessage(nv, "s'est connecté");
+                    }
+*/
                     break;
 
         case REMOVE_USER :
-                    // TO DO
+                    /*nv = m.data1;
+                    for (i = 1; i <=5;i++)
+                    {
+                      p = w->getPersonneConnectee(i);
+                      if (strcmp(p, nv) == 0)
+                      {
+                        w->setPersonneConnectee(i, "");
+                        w->ajouteMessage(nv, "s'est déconnecté");
+                        break;
+                      }
+                    }*/
                     break;
 
         case SEND :
-                    // TO DO
+                    w->ajouteMessage(m.data1, m.texte);
                     break;
 
         case CONSULT :
                   // TO DO
                   break;
       }
+    }
+}
+
+void handlerSIGUSR2(int sig)
+{
+  w->setPublicite(pShm);
+}
+
+void handlerSIGALRM(int sig)
+{
+  if (timeOut > 0) timeOut--;
+  w->setTimeOut(timeOut);
+  if (timeOut == 0)
+  {
+    MESSAGE m;
+    m.requete = LOGOUT;
+    m.expediteur = getpid();
+    m.type = SERVEUR;
+    if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long),0) == -1)
+    {
+      perror("(CLIENT) Erreur envoi requete LOGOUT (TIMEOUT)");
+      exit(1);
+    }
+    w->logoutOK();
+    alarm(0);
+    return;
+  }
+  alarm(1);
 }

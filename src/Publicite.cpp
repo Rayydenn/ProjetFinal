@@ -37,7 +37,7 @@ int main()
 
   while(1)
   {
-  	PUBLICITE pub;
+  	//PUBLICITE pub;
     // Lecture d'une publicité dans le fichier
 
     // Ecriture en mémoire partagée
