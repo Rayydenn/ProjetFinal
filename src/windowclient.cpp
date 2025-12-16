@@ -78,6 +78,18 @@ WindowClient::WindowClient(QWidget *parent):QMainWindow(parent),ui(new Ui::Windo
       exit(1);
     }
 
+    struct sigaction C;
+
+    C.sa_handler = handlerSIGALRM;
+    sigemptyset(&C.sa_mask);
+    C.sa_flags = 0;
+
+    if (sigaction((SIGALRM), &C, NULL) == -1)
+    {
+      perror("Erreur d'armement de SIGALRM");
+      exit(1);
+    }
+
     // Envoi d'une requete de connexion au serveur
 
     MESSAGE connexion;
@@ -408,7 +420,6 @@ void WindowClient::closeEvent(QCloseEvent *event)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void WindowClient::on_pushButtonLogin_clicked()
 {
-
     MESSAGE login;
     int nvch = isNouveauChecked();
     login.type = SERVEUR;
@@ -429,28 +440,58 @@ void WindowClient::on_pushButtonLogin_clicked()
       exit(1);
     }
     fprintf(stderr, "(CLIENT %d) Requete login envoyée\n", getpid());
+
 }
 
 void WindowClient::on_pushButtonLogout_clicked()
 {
-    // TO DO
-    MESSAGE logout;
-    logout.type = SERVEUR;
-    logout.expediteur = getpid();
-    logout.requete = LOGOUT;
-    if (msgsnd(idQ, &logout, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-    {
-      perror("(CLIENT) Erreur de send Logout");
-      msgctl(idQ, IPC_RMID, NULL);
-      exit(1);
-    }
-    fprintf(stderr, "Deconnection du pid : %d, Utilisateur: %s", getpid(), getNom());
-    logoutOK();
+  // TO DO
+  alarm(0);
+  //timeOut = TIME_OUT;
+  //setTimeOut(timeOut); 
+  MESSAGE logout;
+  logout.type = SERVEUR;
+  logout.expediteur = getpid();
+  logout.requete = LOGOUT;
+  if (msgsnd(idQ, &logout, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) Erreur de send Logout");
+    msgctl(idQ, IPC_RMID, NULL);
+    exit(1);
+  }
+  fprintf(stderr, "Deconnection du pid : %d, Utilisateur: %s", getpid(), getNom());
+  logoutOK();
 }
 
 void WindowClient::on_pushButtonEnvoyer_clicked()
 {
-    // TO DO
+  // TO DO
+  timeOut = TIME_OUT;
+  setTimeOut(timeOut);
+  alarm(1);
+
+  MESSAGE snd;
+
+  snd.type = SERVEUR;
+  snd.requete = SEND;
+  snd.expediteur = getpid();
+
+  if (strlen(getAEnvoyer()) == 0)
+  {
+    dialogueErreur("Erreur Message", "Veuillez ecrire quelque chose");
+    return;
+  }
+
+  strcpy(snd.texte, getAEnvoyer());
+  if (msgsnd(idQ, &snd, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) Erreur de send message");
+    msgctl(idQ, IPC_RMID, NULL);
+    exit(1);
+  }
+
+  fprintf(stderr, "%d a envoyé un message", getpid());
+  setAEnvoyer("");
 }
 
 void WindowClient::on_pushButtonConsulter_clicked()
@@ -496,72 +537,152 @@ void WindowClient::on_pushButtonModifier_clicked()
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void WindowClient::on_checkBox1_clicked(bool checked)
 {
-    if (checked)
-    {
-        ui->checkBox1->setText("Accepté");
-        // TO DO (etape 2)
-    }
-    else
-    {
-        ui->checkBox1->setText("Refusé");
-        // TO DO (etape 2)
-    }
+  timeOut = TIME_OUT;
+  setTimeOut(timeOut);
+  alarm(1);
+  MESSAGE m;
+  if (checked)
+  {
+      ui->checkBox1->setText("Accepté");
+      m.type = SERVEUR;
+      m.requete = ACCEPT_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(1));
+  }
+  else
+  {
+      ui->checkBox1->setText("Refusé");
+      m.type = SERVEUR;
+      m.requete = REFUSE_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(1));
+  }
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) error d'envoi ACCEPT");
+    exit(1);
+  }
 }
 
 void WindowClient::on_checkBox2_clicked(bool checked)
 {
-    if (checked)
-    {
-        ui->checkBox2->setText("Accepté");
-        // TO DO (etape 2)
-    }
-    else
-    {
-        ui->checkBox2->setText("Refusé");
-        // TO DO (etape 2)
-    }
+  timeOut = TIME_OUT;
+  setTimeOut(timeOut);
+  alarm(1);
+  MESSAGE m;
+  if (checked)
+  {
+      ui->checkBox2->setText("Accepté");
+      m.type = SERVEUR;
+      m.requete = ACCEPT_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(2));
+  }
+  else
+  {
+      ui->checkBox2->setText("Refusé");
+      m.type = SERVEUR;
+      m.requete = REFUSE_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(2));
+  }
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) error d'envoi ACCEPT");
+    exit(1);
+  }
 }
 
 void WindowClient::on_checkBox3_clicked(bool checked)
 {
-    if (checked)
-    {
-        ui->checkBox3->setText("Accepté");
-        // TO DO (etape 2)
-    }
-    else
-    {
-        ui->checkBox3->setText("Refusé");
-        // TO DO (etape 2)
-    }
+  timeOut = TIME_OUT;
+  setTimeOut(timeOut);
+  alarm(1);
+  MESSAGE m;
+  if (checked)
+  {
+      ui->checkBox3->setText("Accepté");
+      m.type = SERVEUR;
+      m.requete = ACCEPT_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(3));
+  }
+  else
+  {
+      ui->checkBox3->setText("Refusé");
+      m.type = SERVEUR;
+      m.requete = REFUSE_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(3));
+  }
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) error d'envoi ACCEPT");
+    exit(1);
+  }
 }
 
 void WindowClient::on_checkBox4_clicked(bool checked)
 {
-    if (checked)
-    {
-        ui->checkBox4->setText("Accepté");
-        // TO DO (etape 2)
-    }
-    else
-    {
-        ui->checkBox4->setText("Refusé");
-        // TO DO (etape 2)
-    }
+  timeOut = TIME_OUT;
+  setTimeOut(timeOut);
+  alarm(1);
+  MESSAGE m;
+  if (checked)
+  {
+      ui->checkBox4->setText("Accepté");
+      m.type = SERVEUR;
+      m.requete = ACCEPT_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(4));
+  }
+  else
+  {
+      ui->checkBox4->setText("Refusé");
+      m.type = SERVEUR;
+      m.requete = REFUSE_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(4));
+  }
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) error d'envoi ACCEPT");
+    exit(1);
+  }
 }
 
 void WindowClient::on_checkBox5_clicked(bool checked)
 {
-    if (checked)
-    {
-        ui->checkBox5->setText("Accepté");
-        // TO DO (etape 2)
-    }
-    else
-    {
-        ui->checkBox5->setText("Refusé");
-        // TO DO (etape 2)
-    }
+  timeOut = TIME_OUT;
+  setTimeOut(timeOut);
+  alarm(1);
+  MESSAGE m;
+  if (checked)
+  {
+      ui->checkBox5->setText("Accepté");
+      m.type = SERVEUR;
+      m.requete = ACCEPT_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(5));
+  }
+  else
+  {
+      ui->checkBox5->setText("Refusé");
+      m.type = SERVEUR;
+      m.requete = REFUSE_USER;
+      m.expediteur = getpid();
+      strcpy(m.data1, getPersonneConnectee(5));
+  }
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) error d'envoi ACCEPT");
+    exit(1);
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -588,6 +709,9 @@ void handlerSIGUSR1(int sig)
         case LOGIN :
                     if (strcmp(m.data1,"1") == 0)
                     {
+                      timeOut = TIME_OUT;
+                      w->setTimeOut(timeOut);
+                      alarm(1);
                       fprintf(stderr,"(CLIENT %d) Login OK\n",getpid());
                       w->loginOK();
                       w->dialogueMessage("Login...",m.texte);
@@ -608,7 +732,7 @@ void handlerSIGUSR1(int sig)
                     break;
 
         case ADD_USER :
-                    /*nv = m.data1;
+                    nv = m.data1;
                     for (i = 1; i <= 5; i++)
                     {
                       p = w->getPersonneConnectee(i);
@@ -621,11 +745,11 @@ void handlerSIGUSR1(int sig)
                        w->setPersonneConnectee(i, nv); // ajoute le nom
                        w->ajouteMessage(nv, "s'est connecté");
                     }
-*/
+
                     break;
 
         case REMOVE_USER :
-                    /*nv = m.data1;
+                    nv = m.data1;
                     for (i = 1; i <=5;i++)
                     {
                       p = w->getPersonneConnectee(i);
@@ -635,7 +759,7 @@ void handlerSIGUSR1(int sig)
                         w->ajouteMessage(nv, "s'est déconnecté");
                         break;
                       }
-                    }*/
+                    }
                     break;
 
         case SEND :
