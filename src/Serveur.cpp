@@ -13,12 +13,13 @@
 #include <unistd.h>
 #include <mysql.h>
 #include <setjmp.h>
+#include <cerrno>
 #include "protocole.h" // contient la cle et la structure d'un message
 #include "FichierUtilisateur.h" // contient estPresent pour le login
 
 int idQ,idShm,idSem;
 TAB_CONNEXIONS *tab;
-int idFilsPub, idFilsAccesBD;
+int idFilsPub, idFilsAccesBD, idFilsConsult;
 sigjmp_buf jumpBuffer;
 int fdPipe[2];
 int temp;
@@ -70,11 +71,40 @@ int main()
   printf("(SERVEUR) Le signal SIGCHLD à bien été armé \n");
 
   // Creation des ressources
-  fprintf(stderr,"(SERVEUR %d) Creation de la file de messages\n",getpid());
-  if ((idQ = msgget(CLE,IPC_CREAT | 0600)) == -1)  // CLE definie dans protocole.h
+   fprintf(stderr,"(SERVEUR %d) Creation de la file de messages\n",getpid());
+  if ((idQ = msgget(CLE, IPC_CREAT | 0600)) == -1)  // CLE definie dans protocole.h
   {
     perror("(SERVEUR) Erreur de msgget");
+    exit(EXIT_FAILURE);
+  }
+  ;
+  if ((idShm = shmget(CLE, 200, IPC_CREAT | 0600)) == -1) {
+    perror("(SERVEUR) Erreur de shmget");
+    msgctl(idQ, IPC_RMID, NULL);
+    exit(EXIT_FAILURE);
+  }
+  fprintf(stderr,"(SERVEUR %d) memoire partagee cree idShm=%d\n", getpid(), idShm);
+
+  idSem = semget(CLE, 1, IPC_CREAT | 0600);
+  if (idSem == -1)
+  {
+    perror("(SERVEUR) Erreur semget");
     exit(1);
+  }
+  union semun
+  {
+    int val;
+    struct semid_ds *buf;
+    unsigned short *array;
+  };
+
+  union semun arg;
+  arg.val = 1;
+
+  if (semctl(idSem, 0, SETVAL, arg) == -1)
+  {
+      perror("(SERVEUR) Erreur semctl SETVAL");
+      exit(1);
   }
 
   // Initialisation du tableau de connexions
@@ -97,13 +127,21 @@ int main()
 
   // Creation du processus Publicite
 
-  int i,k,j;
+  int i,k,j, pid;
   MESSAGE m;
   MESSAGE reponse;
   char requete[200];
   MYSQL_RES  *resultat;
   MYSQL_ROW  tuple;
   PUBLICITE pub;
+
+  pid = fork();
+
+  if (pid == 0)
+  {
+    execl("./Publicite", "./Publicite", NULL);
+  }
+  tab->pidPublicite = pid;
 
   while(1)
   {
@@ -119,6 +157,11 @@ int main()
   	fprintf(stderr,"(SERVEUR %d) Attente d'une requete...\n",getpid());
     if (msgrcv(idQ,&m,sizeof(MESSAGE)-sizeof(long),1,0) == -1)
     {
+      if (errno == EINTR)
+      {
+          // Interruption par signal : PAS une erreur
+          continue;   // boucle
+      }
       perror("(SERVEUR) Erreur de msgrcv");
       msgctl(idQ,IPC_RMID,NULL);
       exit(1);
@@ -176,6 +219,14 @@ int main()
                         if (position == 0)
                         {
                           ajouteUtilisateur(m.data2, m.texte);
+
+                          char requete[256];
+
+                          sprintf(requete, 
+                                      "INSERT INTO UNIX_FINAL VALUES ('NULL','%s', '---', '---');", m.data2);
+
+                          mysql_query(connexion, requete);
+
                           strcpy(reponse.texte, "Utilisateur ajouté\n");
                           i = 0;
                           while (i < 6 && tab->connexions[i].pidFenetre != m.expediteur)
@@ -456,10 +507,35 @@ int main()
 
       case UPDATE_PUB :
                       fprintf(stderr,"(SERVEUR %d) Requete UPDATE_PUB reçue de %d\n",getpid(),m.expediteur);
+                      
+                      for (int i=0;i<6;i++)
+                      {
+                        if (tab->connexions[i].pidFenetre != 0)
+                        {
+                          kill(tab->connexions[i].pidFenetre, SIGUSR2);
+                        }
+                      }
+
                       break;
 
       case CONSULT :
                       fprintf(stderr,"(SERVEUR %d) Requete CONSULT reçue de %d\n",getpid(),m.expediteur);
+                      
+                      idFilsConsult = fork();
+                      if(idFilsConsult == 0)
+                      {
+                        execl("./Consultation", "Consultation", NULL);
+                        perror("execl Consultation");
+                        exit(1);
+                      }
+
+                      m.type = idFilsConsult;
+                      if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                      {
+                          perror("(SERVEUR) Erreur envoi CONSULT");
+                          exit(1);
+                      }
+
                       break;
 
       case MODIF1 :
@@ -517,9 +593,9 @@ void HandlerSIGCHLD(int sig)
   printf("(SERVEUR) SIGCHLD reçu");
   int status, pid, i = 0;
   pid = wait(&status);
-  while (i<6 && tab->connexions[i].pidModification != pid) i++;
-  tab->connexions[i].pidModification = 0;
-  siglongjmp(jumpBuffer, 1);
+  // while (i<6 && tab->connexions[i].pidModification != pid) i++;
+  // tab->connexions[i].pidModification = 0;
+  // siglongjmp(jumpBuffer, 1);
 }
 
 void HandlerSIGINT(int sig)
@@ -536,6 +612,12 @@ void HandlerSIGINT(int sig)
   if (shmctl(idShm, IPC_RMID, NULL) == -1)
   {
     perror("Erreur de la fermeture de la mémoire partagée\n");
+    exit(1);
+  }
+
+  if (semctl(idSem, IPC_RMID, NULL) == -1)
+  {
+    perror("Erreur de la fermeture du sémaphore\n");
     exit(1);
   }
 

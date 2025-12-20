@@ -35,7 +35,7 @@ WindowClient::WindowClient(QWidget *parent):QMainWindow(parent),ui(new Ui::Windo
 
     // Recuperation de l'identifiant de la file de messages
     fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la file de messages\n",getpid());
-    idQ = msgget(CLE, IPC_CREAT | 0666);
+    idQ = msgget(CLE, IPC_CREAT | 0666); // Acceder à la requete CLE
     if (idQ == -1)
     {
       perror("(CLIENT) Erreur msgget");
@@ -43,19 +43,19 @@ WindowClient::WindowClient(QWidget *parent):QMainWindow(parent),ui(new Ui::Windo
     }
 
     // Recuperation de l'identifiant de la mémoire partagée
- /*   fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la mémoire partagée\n",getpid());
-    if ((idShm = shmget(CLE, 0,0)) == -1)
+    fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la mémoire partagée\n",getpid());
+    if ((idShm = shmget(CLE, 200, 0600)) == -1) // Acceder à un segment mémoire
     {
       perror("(PUBLICITE) Erreur lors de la récupération de l'id de la mémoire partagée");
       exit(1);
     }
 
     // Attachement à la mémoire partagée
-    if ((pShm = (char *)shmat(idShm, NULL, 0)) == (char *) - 1)
+    if ((pShm = (char *)shmat(idShm, NULL, 0)) == (char *) - 1) // Attacher la mémoire à l'espace du processus
     {
       perror("(PUBLICITE) Erreur lors de l'attachement de la mémoire partagée");
       exit(1);
-    }*/
+    }
 
     // Armement des signaux
     struct sigaction A;
@@ -98,10 +98,10 @@ WindowClient::WindowClient(QWidget *parent):QMainWindow(parent),ui(new Ui::Windo
     connexion.expediteur = getpid();
 
     fprintf(stderr, "(CLIENT %d) Requete CONNECT envoyée\n", getpid());
-    if (msgsnd(idQ, &connexion, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    if (msgsnd(idQ, &connexion, sizeof(MESSAGE) - sizeof(long), 0) == -1) // Envoyer un message
     {
       perror("(CLIENT) Erreur de send");
-      msgctl(idQ, IPC_RMID, NULL);
+      msgctl(idQ, IPC_RMID, NULL);  // Controle (dans ce cas, suppresion de idQ en cas d'erreur)
       exit(1);
     }
 }
@@ -446,9 +446,7 @@ void WindowClient::on_pushButtonLogin_clicked()
 void WindowClient::on_pushButtonLogout_clicked()
 {
   // TO DO
-  alarm(0);
-  //timeOut = TIME_OUT;
-  //setTimeOut(timeOut); 
+  alarm(0);                         // Deconnexion directe
   MESSAGE logout;
   logout.type = SERVEUR;
   logout.expediteur = getpid();
@@ -466,7 +464,7 @@ void WindowClient::on_pushButtonLogout_clicked()
 void WindowClient::on_pushButtonEnvoyer_clicked()
 {
   // TO DO
-  timeOut = TIME_OUT;
+  timeOut = TIME_OUT;               // On reset le timer de deconnexion
   setTimeOut(timeOut);
   alarm(1);
 
@@ -496,13 +494,38 @@ void WindowClient::on_pushButtonEnvoyer_clicked()
 
 void WindowClient::on_pushButtonConsulter_clicked()
 {
-    // TO DO
+  timeOut = TIME_OUT;
+  setTimeOut(timeOut);
+  alarm(1);
+  const char* nomRens = getNomRenseignements();
+  if (nomRens == nullptr || strlen(nomRens) == 0) {
+      fprintf(stderr, "(CLIENT) Aucun nom renseigné pour CONSULT\n");
+      return;
+  }
+
+  MESSAGE r;
+  strcpy(r.data1, nomRens);
+
+  r.type = SERVEUR;
+  r.requete = CONSULT;
+  r.expediteur = getpid();
+
+
+  if (msgsnd(idQ, &r, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) Erreur d'envoie requete CONSULT");
+    msgctl(idQ, IPC_RMID, NULL);
+    exit(1);
+  }
 
 }
 
 void WindowClient::on_pushButtonModifier_clicked()
 {
   // TO DO
+  timeOut = TIME_OUT;
+  setTimeOut(timeOut);
+  alarm(1);
   // Envoi d'une requete MODIF1 au serveur
   MESSAGE m;
   // ...
@@ -690,7 +713,7 @@ void WindowClient::on_checkBox5_clicked(bool checked)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void handlerSIGUSR1(int sig)
 {
-    MESSAGE m, login;
+    MESSAGE m, login, r;
     const char* nv;
     const char* p;
     int i;    
@@ -716,17 +739,6 @@ void handlerSIGUSR1(int sig)
                       w->loginOK();
                       w->dialogueMessage("Login...",m.texte);
                       
-                      strcpy(login.data1, m.data1);
-                      login.type = SERVEUR;
-                      login.requete = CONSULT;
-                      login.expediteur = getpid();
-
-                      if (msgsnd(idQ, &login, sizeof(MESSAGE) - sizeof(long), 0) == -1)
-                      {
-                        perror("(CLIENT) Erreur d'envoie de la requete CONSULT");
-                        msgctl(idQ, IPC_RMID, NULL);
-                        exit(1);
-                      }
                     }
                     else w->dialogueErreur("Login...",m.texte);
                     break;
@@ -767,7 +779,17 @@ void handlerSIGUSR1(int sig)
                     break;
 
         case CONSULT :
-                  // TO DO
+                    fprintf(stderr, "(CLIENT) Consult reçu\n");
+                    if (strcmp(m.data1,"OK") == 0)
+                    {
+                      w->setGsm(m.data2);
+                      w->setEmail(m.texte);
+                    }
+                    else
+                    {
+                      w->setGsm("NON TROUVE");
+                      w->setEmail("NON TROUVE");
+                    }
                   break;
       }
     }
