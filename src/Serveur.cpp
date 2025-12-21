@@ -223,9 +223,13 @@ int main()
                           char requete[256];
 
                           sprintf(requete, 
-                                      "INSERT INTO UNIX_FINAL VALUES ('NULL','%s', '---', '---');", m.data2);
+                                      "INSERT INTO UNIX_FINAL VALUES (NULL,'%s', '---', '---');", m.data2);
+                          
+                          if (mysql_query(connexion, requete) == 0)
+                          {
+                            fprintf(stderr, "INSERT OK\n");
+                          }
 
-                          mysql_query(connexion, requete);
 
                           strcpy(reponse.texte, "Utilisateur ajouté\n");
                           i = 0;

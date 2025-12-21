@@ -18,14 +18,39 @@ int main()
 
   // Recuperation de l'identifiant de la file de messages
   fprintf(stderr,"(MODIFICATION %d) Recuperation de l'id de la file de messages\n",getpid());
+  idQ = msgget(CLE, 0);
+  if (idQ == -1)
+  {
+    perror("Erreur de récupération id file de messages");
+    exit(1);
+  }
 
   // Recuperation de l'identifiant du sémaphore
+
+  idSem = semget(CLE, 1, 0);
+
+  if (idSem == -1)
+  {
+    perror("Erreur de get sémaphore");
+    exit(1);
+  }
 
   MESSAGE m;
   // Lecture de la requête MODIF1
   fprintf(stderr,"(MODIFICATION %d) Lecture requete MODIF1\n",getpid());
 
   // Tentative de prise non bloquante du semaphore 0 (au cas où un autre utilisateut est déjà en train de modifier)
+
+  struct sembuf op;
+  op.sem_num = 0;
+  op.sem_op  = -1;
+  op.sem_flg = 0;
+
+  if (semop(idSem, &op, 1) == -1)
+  {
+      perror("(MODIFICATION) semop take");
+      exit(1);
+  }
 
   // Connexion à la base de donnée
   MYSQL *connexion = mysql_init(NULL);
@@ -49,9 +74,17 @@ int main()
 
   // Construction et envoi de la reponse
   fprintf(stderr,"(MODIFICATION %d) Envoi de la reponse\n",getpid());
+  m.type = m.expediteur;
+  m.expediteur = getpid();
+  m.requete = MODIF1;
+
+  msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0);
   
   // Attente de la requête MODIF2
   fprintf(stderr,"(MODIFICATION %d) Attente requete MODIF2...\n",getpid());
+
+  msgrcv(idQ, &m, sizeof(MESSAGE) - sizeof(long), getpid(), 0);
+
 
   // Mise à jour base de données
   fprintf(stderr,"(MODIFICATION %d) Modification en base de données pour --%s--\n",getpid(),nom);

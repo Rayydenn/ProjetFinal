@@ -49,6 +49,10 @@ int main()
       perror("(CONSULTATION) semop take");
       exit(1);
   }
+
+  fprintf(stderr,"(CLIENT %d) Requete CONSULT reçue de %d\n",getpid(),m.expediteur);
+                      
+
   // Connexion à la base de donnée
   MYSQL *connexion = mysql_init(NULL);
   fprintf(stderr,"(CONSULTATION %d) Connexion à la BD\n",getpid());
@@ -92,12 +96,14 @@ int main()
   else
   {
     strcpy(m.data1, "KO");
+    strcpy(m.texte, "NON TROUVE");
+    strcpy(m.data2, "NON TROUVE");
   }
 
   // Construction et envoi de la reponse
-  m.expediteur = getpid();
   m.requete = CONSULT;
   m.type = m.expediteur;
+  m.expediteur = getpid();
 
   msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0);
   kill(m.type, SIGUSR1);

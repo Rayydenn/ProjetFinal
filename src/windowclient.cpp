@@ -44,7 +44,7 @@ WindowClient::WindowClient(QWidget *parent):QMainWindow(parent),ui(new Ui::Windo
 
     // Recuperation de l'identifiant de la mémoire partagée
     fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la mémoire partagée\n",getpid());
-    if ((idShm = shmget(CLE, 200, 0600)) == -1) // Acceder à un segment mémoire
+    if ((idShm = shmget(CLE, 0, 0)) == -1) // Acceder à un segment mémoire
     {
       perror("(PUBLICITE) Erreur lors de la récupération de l'id de la mémoire partagée");
       exit(1);
@@ -510,6 +510,7 @@ void WindowClient::on_pushButtonConsulter_clicked()
   r.requete = CONSULT;
   r.expediteur = getpid();
 
+  fprintf(stderr, "(CLIENT %d) Requete CONSULT envoyée au Serveur\n", r.expediteur);
 
   if (msgsnd(idQ, &r, sizeof(MESSAGE) - sizeof(long), 0) == -1)
   {
@@ -528,10 +529,23 @@ void WindowClient::on_pushButtonModifier_clicked()
   alarm(1);
   // Envoi d'une requete MODIF1 au serveur
   MESSAGE m;
-  // ...
+
+  m.type = SERVEUR;
+  m.requete = MODIF1;
+  m.expediteur = getpid();
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) Erreur d'envoie requete CONSULT");
+    msgctl(idQ, IPC_RMID, NULL);
+    exit(1);
+  }
 
   // Attente d'une reponse en provenance de Modification
   fprintf(stderr,"(CLIENT %d) Attente reponse MODIF1\n",getpid());
+
+  msgrcv(idQ, &m, sizeof(MESSAGE) - sizeof(long), getpid(), 0);
+
   // ...
 
   // Verification si la modification est possible
@@ -552,7 +566,7 @@ void WindowClient::on_pushButtonModifier_clicked()
   strcpy(email,dialogue.getEmail());
 
   // Envoi des données modifiées au serveur
-  // ...
+  
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -740,7 +754,7 @@ void handlerSIGUSR1(int sig)
                       w->dialogueMessage("Login...",m.texte);
                       
                     }
-                    else w->dialogueErreur("Login...",m.texte);
+                    else w->dialogueMessage("Login...",m.texte);
                     break;
 
         case ADD_USER :
