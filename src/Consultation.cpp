@@ -90,8 +90,8 @@ int main()
         strcpy(tuple[i], "NON TROUVE");
       }
     }
-    strcpy(m.data2, tuple[0]); // gsm
-    strcpy(m.texte, tuple[1]); // email
+    strcpy(m.data2, tuple[0]); 
+    strcpy(m.texte, tuple[1]); 
   }
   else
   {

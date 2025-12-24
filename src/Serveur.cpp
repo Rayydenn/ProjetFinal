@@ -19,7 +19,7 @@
 
 int idQ,idShm,idSem;
 TAB_CONNEXIONS *tab;
-int idFilsPub, idFilsAccesBD, idFilsConsult;
+int idFilsPub, idFilsAccesBD, idFilsConsult, pidmodif;
 sigjmp_buf jumpBuffer;
 int fdPipe[2];
 int temp;
@@ -198,7 +198,7 @@ int main()
                       MESSAGE reponse;
                       position = estPresent(m.data2);
 
-                      if (strlen(m.data1) == 0 || strlen(m.texte) == 0) // si rien n'est entré
+                      if (strlen(m.data1) == 0 || strlen(m.texte) == 0)
                       {
                         strcpy(reponse.data1, "0");
                         strcpy(reponse.texte, "Veuillez entrer un utilisateur et un mot de passe !\n");
@@ -211,10 +211,10 @@ int main()
                             exit(1);
                         }
                         kill(m.expediteur, SIGUSR1);
-                        break;  // on sort directement du case LOGIN
+                        break;
                       }
 
-                      if (strcmp(m.data1, nvclient) == 0) // Utilisateur absent
+                      if (strcmp(m.data1, nvclient) == 0) // Absent
                       {
                         if (position == 0)
                         {
@@ -238,7 +238,7 @@ int main()
                           tab->connexions[i].nom[0] = '\0';
                           strcpy(tab->connexions[i].nom, m.data2);
 
-                          // Notifier les utilisateurs
+                          // Notifier
                           for (int k = 0; k < 6;k++)
                           {
                             if (tab->connexions[k].pidFenetre != 0 && tab->connexions[k].pidFenetre != m.expediteur && strlen(tab->connexions[k].nom) > 0)
@@ -274,7 +274,7 @@ int main()
                         }
                       }
 
-                      else // l'utilisateur veut se connecter
+                      else // Connexion
                       {
                         if (position == 0)
                         {
@@ -299,7 +299,7 @@ int main()
                           if (!isFalse)
                           {
                             strcpy(tab->connexions[pos].nom, m.data2);
-                            strcpy(reponse.data1, "1"); // OK
+                            strcpy(reponse.data1, "1");
                             strcpy(reponse.texte, "Vous êtes connectés!\n");
                             i = 0;
                             while (i < 6 && tab->connexions[i].pidFenetre != m.expediteur) i++;
@@ -342,8 +342,6 @@ int main()
                         }
                       }
 
-                      // Envoyer reponse LOGIN au client
-
                       reponse.type = m.expediteur;
                       reponse.expediteur = getpid();
                       reponse.requete = LOGIN;
@@ -371,13 +369,13 @@ int main()
                           MESSAGE notif;
                           notif.type = tab->connexions[k].pidFenetre;
                           notif.expediteur = getpid();
-                          notif.requete = REMOVE_USER;  // Requete pour notifier qu'un client s'est deconnecté
-                          strcpy(notif.data1, deconnecte); // Nom du client qui s'est déconnecté
+                          notif.requete = REMOVE_USER;
+                          strcpy(notif.data1, deconnecte);
                           if (msgsnd(idQ, &notif, sizeof(MESSAGE)- sizeof(long),0) == -1)
                           {
                             perror("(SERVEUR) Erreur d'envoi REMOVE_USER");
                           }
-                          kill(tab->connexions[k].pidFenetre, SIGUSR1); // Notifier client
+                          kill(tab->connexions[k].pidFenetre, SIGUSR1);
                         }
                         for (int j = 0;j<5;j++)
                         {
@@ -544,30 +542,198 @@ int main()
 
       case MODIF1 :
                       fprintf(stderr,"(SERVEUR %d) Requete MODIF1 reçue de %d\n",getpid(),m.expediteur);
+                      i = 0;
+
+                      while (i < 6 && tab->connexions[i].pidFenetre != 0 && tab->connexions[i].pidFenetre != m.expediteur)
+                        i++;
+
+                      if (i == 6)
+                        break;
+                      if (tab->connexions[i].pidModification != 0)
+                      {
+                        fprintf(stderr, "(SERVEUR) Modif1 ignorée: déjà en cours\n");
+                        break;
+                      }
+
+                      pidmodif = fork();
+                      if (pidmodif == 0)
+                      {
+                        execl("./Modification", "Modification", NULL);
+                        perror("execl Modification");
+                        exit(1);
+                      }
+
+                      tab->connexions[i].pidModification = pidmodif;
+                      strcpy(m.data1, tab->connexions[i].nom);
+
+                      m.type = pidmodif;
+                      // Modification
+                      if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                      {
+                        perror("(SERVEUR) Erreur de send Modif1");
+                        exit(1);
+                      }
+
                       break;
 
       case MODIF2 :
                       fprintf(stderr,"(SERVEUR %d) Requete MODIF2 reçue de %d\n",getpid(),m.expediteur);
+                      
+                      i = 0;
+
+                      while (i < 6 && tab->connexions[i].pidFenetre != 0 && tab->connexions[i].pidFenetre != m.expediteur)
+                        i++;
+
+                      if (i == 6)
+                        break;
+
+                      pidmodif = tab->connexions[i].pidModification;
+                      if (pidmodif == 0)
+                      {
+                        fprintf(stderr, "(SERVEUR) MODIF2 sans MODIF1");
+                        break;
+                      }
+
+                      m.type = pidmodif;
+                      if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                      {
+                        perror("(SERVEUR) Erreur de send MODIF2");
+                        exit(1);
+                      }
+
                       break;
 
       case LOGIN_ADMIN :
                       fprintf(stderr,"(SERVEUR %d) Requete LOGIN_ADMIN reçue de %d\n",getpid(),m.expediteur);
+
+                      if (tab->pidAdmin == 0)
+                      {
+                        tab->pidAdmin = m.expediteur;
+                        strcpy(m.data1, "OK");
+                        m.type = m.expediteur;
+                        m.expediteur = getpid();
+
+                        if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                        {
+                          perror("(SERVEUR) Erreur de send LOGIN_ADMIN");
+                          exit(1);
+                        }
+                      }
+                      else
+                      {
+                        strcpy(m.data1, "KO");
+                        m.type = m.expediteur;
+                        m.expediteur = getpid();
+
+                        if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                        {
+                          perror("(SERVEUR) Erreur de send LOGIN_ADMIN");
+                          exit(1);
+                        }
+                      }
+                      
                       break;
 
       case LOGOUT_ADMIN :
                       fprintf(stderr,"(SERVEUR %d) Requete LOGOUT_ADMIN reçue de %d\n",getpid(),m.expediteur);
+                      
+                      if (m.expediteur == tab->pidAdmin)
+                      {
+                        tab->pidAdmin = 0;
+                      }
+
                       break;
 
       case NEW_USER :
                       fprintf(stderr,"(SERVEUR %d) Requete NEW_USER reçue de %d : --%s--%s--\n",getpid(),m.expediteur,m.data1,m.data2);
+                      
+                      position = estPresent(m.data1);
+
+                      if (position == 0)
+                      {
+                        ajouteUtilisateur(m.data1, m.data2);
+                        sprintf(requete, 
+                          "INSERT INTO UNIX_FINAL values (NULL, '%s', '%s', '%s'",
+                                                             m.data1, "---", "---");
+                        mysql_query(connexion, requete);
+                        strcpy(m.data1, "OK");
+                        strcpy(m.texte, "Utilisateur ajouté a la base de données");
+                        m.type = m.expediteur;
+                        m.expediteur = getpid();
+                      }
+                      else
+                      {
+                        strcpy(m.data1, "KO");
+                        strcpy(m.texte, "Utilisateur déjà présent dans la base de données");
+                        m.type = m.expediteur;
+                        m.expediteur = getpid();
+                      }
+
+                      if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                      {
+                        perror("(SERVER) Erreur d'envoie requete NEW_USER");
+                        exit(1);
+                      }
+
                       break;
 
       case DELETE_USER :
                       fprintf(stderr,"(SERVEUR %d) Requete DELETE_USER reçue de %d : --%s--\n",getpid(),m.expediteur,m.data1);
+                      
+                      position = estPresent(m.data1);
+                      if (position == 0)
+                      {
+                        strcpy(m.data1, "KO");
+                        strcpy(m.texte, "L'Utilisateur n'est pas présent dans le fichier utilisateurs.dat");
+                        m.type = m.expediteur;
+                        m.expediteur = getpid();
+                      }
+                      else
+                      {
+                        supprimerUtilisateur(m.data1);
+
+                        sprintf(requete, "DELETE FROM UNIX_FINAL where nom = '%s'", m.data1);
+                        mysql_query(connexion, requete);
+                        m.type = m.expediteur;
+                        m.expediteur = getpid();
+
+                        strcpy(m.data1, "OK");
+                        strcpy(m.texte, "L'Utilisateur a bien été supprimé du fichier et de la base de données");
+                      }
+
+                      if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+                      {
+                        perror("(ADMIN) Erreur d'envoie de la requete LOGOUT_ADMIN");
+                        exit(1);
+                      }
+
                       break;
 
       case NEW_PUB :
                       fprintf(stderr,"(SERVEUR %d) Requete NEW_PUB reçue de %d\n",getpid(),m.expediteur);
+                      
+                      int fd = open("publicites.dat", O_APPEND | O_WRONLY | O_CREAT, 0644);
+                      if (fd == -1)
+                      {
+                        perror("Erreur d'ouverture du fichier");
+                        exit(1);
+                      }
+
+                      PUBLICITE p;
+                      strcpy(p.texte, m.texte);
+                      p.nbSecondes = atoi(m.data1);
+
+                      if (write(fd, &p, sizeof(PUBLICITE)) != sizeof(PUBLICITE))
+                      {
+                        perror("Erreur de write");
+                        exit(1);
+                      }
+                      close(fd);
+
+                      if (tab->pidPublicite > 0)
+                        kill(tab->pidPublicite, SIGUSR1);
+
+                      
                       break;
     }
     afficheTab();
@@ -597,8 +763,9 @@ void HandlerSIGCHLD(int sig)
   printf("(SERVEUR) SIGCHLD reçu");
   int status, pid, i = 0;
   pid = wait(&status);
-  // while (i<6 && tab->connexions[i].pidModification != pid) i++;
-  // tab->connexions[i].pidModification = 0;
+  fprintf(stderr, "(SERVEUR) Suppression du fils zombi %d\n", pid);
+  while (i<6 && tab->connexions[i].pidModification != pid) i++;
+  tab->connexions[i].pidModification = 0;
   // siglongjmp(jumpBuffer, 1);
 }
 

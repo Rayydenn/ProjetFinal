@@ -35,7 +35,7 @@ WindowClient::WindowClient(QWidget *parent):QMainWindow(parent),ui(new Ui::Windo
 
     // Recuperation de l'identifiant de la file de messages
     fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la file de messages\n",getpid());
-    idQ = msgget(CLE, IPC_CREAT | 0666); // Acceder à la requete CLE
+    idQ = msgget(CLE, IPC_CREAT | 0666);
     if (idQ == -1)
     {
       perror("(CLIENT) Erreur msgget");
@@ -44,14 +44,14 @@ WindowClient::WindowClient(QWidget *parent):QMainWindow(parent),ui(new Ui::Windo
 
     // Recuperation de l'identifiant de la mémoire partagée
     fprintf(stderr,"(CLIENT %d) Recuperation de l'id de la mémoire partagée\n",getpid());
-    if ((idShm = shmget(CLE, 0, 0)) == -1) // Acceder à un segment mémoire
+    if ((idShm = shmget(CLE, 0, 0)) == -1)
     {
       perror("(PUBLICITE) Erreur lors de la récupération de l'id de la mémoire partagée");
       exit(1);
     }
 
     // Attachement à la mémoire partagée
-    if ((pShm = (char *)shmat(idShm, NULL, 0)) == (char *) - 1) // Attacher la mémoire à l'espace du processus
+    if ((pShm = (char *)shmat(idShm, NULL, 0)) == (char *) - 1)
     {
       perror("(PUBLICITE) Erreur lors de l'attachement de la mémoire partagée");
       exit(1);
@@ -98,10 +98,10 @@ WindowClient::WindowClient(QWidget *parent):QMainWindow(parent),ui(new Ui::Windo
     connexion.expediteur = getpid();
 
     fprintf(stderr, "(CLIENT %d) Requete CONNECT envoyée\n", getpid());
-    if (msgsnd(idQ, &connexion, sizeof(MESSAGE) - sizeof(long), 0) == -1) // Envoyer un message
+    if (msgsnd(idQ, &connexion, sizeof(MESSAGE) - sizeof(long), 0) == -1)
     {
       perror("(CLIENT) Erreur de send");
-      msgctl(idQ, IPC_RMID, NULL);  // Controle (dans ce cas, suppresion de idQ en cas d'erreur)
+      msgctl(idQ, IPC_RMID, NULL);  // Suppression si erreur
       exit(1);
     }
 }
@@ -446,7 +446,7 @@ void WindowClient::on_pushButtonLogin_clicked()
 void WindowClient::on_pushButtonLogout_clicked()
 {
   // TO DO
-  alarm(0);                         // Deconnexion directe
+  alarm(0);                         // Deconnexion
   MESSAGE logout;
   logout.type = SERVEUR;
   logout.expediteur = getpid();
@@ -464,7 +464,7 @@ void WindowClient::on_pushButtonLogout_clicked()
 void WindowClient::on_pushButtonEnvoyer_clicked()
 {
   // TO DO
-  timeOut = TIME_OUT;               // On reset le timer de deconnexion
+  timeOut = TIME_OUT;
   setTimeOut(timeOut);
   alarm(1);
 
@@ -544,9 +544,11 @@ void WindowClient::on_pushButtonModifier_clicked()
   // Attente d'une reponse en provenance de Modification
   fprintf(stderr,"(CLIENT %d) Attente reponse MODIF1\n",getpid());
 
-  msgrcv(idQ, &m, sizeof(MESSAGE) - sizeof(long), getpid(), 0);
-
-  // ...
+  if (msgrcv(idQ, &m, sizeof(MESSAGE) - sizeof(long), getpid(), 0) == -1)
+  {
+    perror("(CLIENT) Erreur de receive requete MODIF1");
+    exit(1);
+  }
 
   // Verification si la modification est possible
   if (strcmp(m.data1,"KO") == 0 && strcmp(m.data2,"KO") == 0 && strcmp(m.texte,"KO") == 0)
@@ -566,6 +568,20 @@ void WindowClient::on_pushButtonModifier_clicked()
   strcpy(email,dialogue.getEmail());
 
   // Envoi des données modifiées au serveur
+
+  strcpy(m.data2, gsm);
+  strcpy(m.texte, email);
+  strcpy(m.data1, motDePasse);
+
+  m.type = SERVEUR;
+  m.expediteur = getpid();
+  m.requete = MODIF2;
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(CLIENT) Erreur de send MODIF2");
+    exit(1);
+  }
   
 }
 
@@ -768,7 +784,7 @@ void handlerSIGUSR1(int sig)
 
                     if (i <= 5)
                     {
-                       w->setPersonneConnectee(i, nv); // ajoute le nom
+                       w->setPersonneConnectee(i, nv);
                        w->ajouteMessage(nv, "s'est connecté");
                     }
 

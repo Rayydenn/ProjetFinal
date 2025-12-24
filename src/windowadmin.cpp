@@ -19,6 +19,17 @@ WindowAdmin::WindowAdmin(QWidget *parent):QMainWindow(parent),ui(new Ui::WindowA
 WindowAdmin::~WindowAdmin()
 {
     delete ui;
+
+    MESSAGE m;
+    m.type = 1;
+    m.requete = LOGOUT_ADMIN;
+    m.expediteur = getpid();
+
+    if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    {
+      perror("(ADMIN) Erreur d'envoie de requete LOGOUT_ADMIN");
+      exit(1);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,20 +124,105 @@ void WindowAdmin::dialogueErreur(const char* titre,const char* message)
 void WindowAdmin::on_pushButtonAjouterUtilisateur_clicked()
 {
   // TO DO
+  MESSAGE m;
+
+  m.type = 1;
+  m.expediteur = getpid();
+  m.requete = NEW_USER;
+
+  strcpy(m.data1, getNom());
+  strcpy(m.data2, getMotDePasse());
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(ADMIN) Erreur d'envoie de la requete LOGOUT_ADMIN");
+    exit(1);
+  }
+
+  if (msgrcv(idQ, &m, sizeof(MESSAGE) - sizeof(long), getpid(), 0) == -1)
+  {
+    perror("(ADMIN) Erreur de receive requete NEW_USER");
+    exit(1);
+  }
+
+  if (strcmp(m.data1, "OK") == 0)
+  {
+    dialogueMessage("Ajout Admin",m.texte);
+  }
+  else
+  {
+    dialogueMessage("Ajout Admin",m.texte);
+  }
+
 }
 
 void WindowAdmin::on_pushButtonSupprimerUtilisateur_clicked()
 {
   // TO DO
+  MESSAGE m;
+
+  m.type = 1;
+  m.requete = DELETE_USER;
+  m.expediteur = getpid();
+
+  strcpy(m.data1, getNom());
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(ADMIN) Erreur d'envoie de la requete DELETE_USER");
+    exit(1);
+  }
+
+  if (msgrcv(idQ, &m, sizeof(MESSAGE) - sizeof(long), getpid(), 0) == -1)
+  {
+    perror("(ADMIN) Erreur de receive requete DELETE_USER");
+    exit(1);
+  }
+
+  if (strcmp(m.data1, "OK") == 0)
+  {
+    dialogueMessage("Suppression",m.texte);
+  }
+  else
+  {
+    dialogueMessage("Suppression",m.texte);
+  }
+
 }
 
 void WindowAdmin::on_pushButtonAjouterPublicite_clicked()
 {
   // TO DO
+  MESSAGE m;
+
+  m.type = 1;
+  m.requete = NEW_PUB;
+  m.expediteur = getpid();
+
+  sprintf(m.data1, "%d",getNbSecondes());
+  strcpy(m.texte, getTexte());
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(ADMIN) Erreur d'envoie de la requete NEW_PUB");
+    exit(1);
+  }
 }
 
 void WindowAdmin::on_pushButtonQuitter_clicked()
 {
   // TO DO
+  MESSAGE m;
+
+  m.type = 1;
+  m.requete = LOGOUT_ADMIN;
+  m.expediteur = getpid();
+
+  if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+  {
+    perror("(ADMIN) Erreur d'envoie de la requete LOGOUT_ADMIN");
+    exit(1);
+  }
+
   exit(0);
 }

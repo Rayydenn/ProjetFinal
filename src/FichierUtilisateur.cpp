@@ -62,6 +62,53 @@ void ajouteUtilisateur(const char* nom, const char* motDePasse)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
+void supprimerUtilisateur(const char* nom)
+{
+  UTILISATEUR tmp;
+  int fd = open(FICHIER_UTILISATEURS, O_RDONLY);
+
+  if (fd == -1)
+  {
+    perror("Erreur d'ouverture du fichier");
+    return;
+  }
+
+  int fdtmp = open("temp.dat", O_CREAT | O_WRONLY | O_TRUNC, 0600);
+  if (fdtmp == -1)
+  {
+    perror("Erreur d'ouverture du fichier temp.dat");
+    close(fd);
+    return;
+  }
+
+  UTILISATEUR user;
+  int trouve = 0;
+
+  while (read(fd, &user, sizeof(UTILISATEUR)) == sizeof(UTILISATEUR))
+  {
+    if (strcmp(user.nom, nom) == 0)
+    {
+      trouve = 1;
+      continue; // Skip
+    }
+    write(fdtmp, &user, sizeof(UTILISATEUR));
+  }
+
+  close(fd);
+  close(fdtmp);
+
+  if (!trouve)
+  {
+    unlink("temp.dat");
+    return;
+  }
+
+  unlink(FICHIER_UTILISATEURS);
+  rename("temp.dat", FICHIER_UTILISATEURS);
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////
 int verifieMotDePasse(int pos, const char* motDePasse)
 {
   UTILISATEUR temp;
