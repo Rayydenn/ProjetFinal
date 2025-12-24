@@ -472,7 +472,7 @@ int main()
                               {
                                 if (tab->connexions[k].pidFenetre == m.type)
                                 {
-                                  strcpy(tmp.data1, tab->connexions[i].nom);
+                                  strcpy(m.data1, tab->connexions[i].nom);
 
                                   m.requete = SEND;
 
@@ -733,7 +733,7 @@ int main()
                       if (tab->pidPublicite > 0)
                         kill(tab->pidPublicite, SIGUSR1);
 
-                      
+
                       break;
     }
     afficheTab();
