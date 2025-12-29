@@ -198,7 +198,7 @@ int main()
                       MESSAGE reponse;
                       position = estPresent(m.data2);
 
-                      if (strlen(m.data1) == 0 || strlen(m.texte) == 0)
+                      if (strlen(m.data2) == 0 || strlen(m.texte) == 0)
                       {
                         strcpy(reponse.data1, "0");
                         strcpy(reponse.texte, "Veuillez entrer un utilisateur et un mot de passe !\n");
