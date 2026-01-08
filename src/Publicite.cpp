@@ -30,7 +30,7 @@ int main()
 
   // Recuperation de l'identifiant de la file de messages
   fprintf(stderr,"(PUBLICITE %d) Recuperation de l'id de la file de messages\n",getpid());
-  idQ = msgget(CLE, 0);  // Acceder à la requete CLE
+  idQ = msgget(CLE, 0);
   if (idQ == -1)
   {
     perror("Erreur de la récuperation de l'id de la file");
@@ -39,7 +39,7 @@ int main()
 
   // Recuperation de l'identifiant de la mémoire partagée
   fprintf(stderr,"(PUBLICITE %d) Recuperation de l'id de la mémoire partagée\n",getpid());
-  idShm = shmget(CLE, 200, 0);  // Acceder à un segment mémoire
+  idShm = shmget(CLE, 200, 0);  // Acceder segmentmem
   if (idShm == -1)
   {
     perror("Erreur de la récuperation de l'id de la mémoire partagée");

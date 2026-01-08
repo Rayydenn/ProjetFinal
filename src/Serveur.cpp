@@ -179,7 +179,6 @@ int main()
                           break;
                         }
                       }
-                      fprintf(stderr, "(SERVEUR) Trop de client");
                       break; 
 
       case DECONNECT :  

@@ -400,6 +400,18 @@ void WindowClient::closeEvent(QCloseEvent *event)
 {
     // TO DO
     fprintf(stderr, "Arret du programme..");
+    MESSAGE l;
+    l.type = 1;
+    l.expediteur = getpid();
+    l.requete = LOGOUT;
+
+    if (msgsnd(idQ, &l, sizeof(MESSAGE) - sizeof(long), 0) == -1)
+    {
+      perror("(CLIENT) Erreur de send Deconnexion");
+      msgctl(idQ, IPC_RMID, NULL);
+      exit(1);
+    }
+
     MESSAGE m;
     m.type = 1;
     m.expediteur = getpid();
