@@ -555,6 +555,7 @@ int main()
                       }
 
                       pidmodif = fork();
+                      m.type = pidmodif;
                       if (pidmodif == 0)
                       {
                         execl("./Modification", "Modification", NULL);
@@ -565,7 +566,6 @@ int main()
                       tab->connexions[i].pidModification = pidmodif;
                       strcpy(m.data1, tab->connexions[i].nom);
 
-                      m.type = pidmodif;
                       // Modification
                       if (msgsnd(idQ, &m, sizeof(MESSAGE) - sizeof(long), 0) == -1)
                       {
@@ -759,12 +759,12 @@ void afficheTab()
 
 void HandlerSIGCHLD(int sig)
 {
-  printf("(SERVEUR) SIGCHLD reçu");
   int status, pid, i = 0;
   pid = wait(&status);
   fprintf(stderr, "(SERVEUR) Suppression du fils zombi %d\n", pid);
   while (i<6 && tab->connexions[i].pidModification != pid) i++;
-  tab->connexions[i].pidModification = 0;
+  if (tab->connexions[i].pidModification == pid)
+    tab->connexions[i].pidModification = 0;
   // siglongjmp(jumpBuffer, 1);
 }
 

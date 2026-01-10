@@ -506,6 +506,7 @@ void WindowClient::on_pushButtonEnvoyer_clicked()
 
 void WindowClient::on_pushButtonConsulter_clicked()
 {
+  alarm(0);
   timeOut = TIME_OUT;
   setTimeOut(timeOut);
   alarm(1);

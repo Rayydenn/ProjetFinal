@@ -91,7 +91,6 @@ int main()
 
   // Construction et envoi de la reponse
   fprintf(stderr,"(MODIFICATION %d) Envoi de la reponse\n",getpid());
-  strcpy(m.data1, "OK");
   strcpy(m.data2, tuple[0]);
   strcpy(m.texte, tuple[1]);
   m.type = m.expediteur;
@@ -129,9 +128,6 @@ int main()
   // Deconnexion BD
   mysql_free_result(resultat);
   mysql_close(connexion);
-
-
-  kill(m.type, SIGCHLD);
 
   // Libération du semaphore 0
   fprintf(stderr,"(MODIFICATION %d) Libération du sémaphore 0\n",getpid());
