@@ -783,7 +783,12 @@ void handlerSIGUSR1(int sig)
                       w->dialogueMessage("Login...",m.texte);
                       
                     }
-                    else w->dialogueMessage("Login...",m.texte);
+                    else 
+                    {
+                      w->loginOK();
+                      w->dialogueMessage("Login...",m.texte);
+                    }
+
                     break;
 
         case ADD_USER :
