@@ -199,7 +199,7 @@ int main()
 
                       if (strlen(m.data2) == 0 || strlen(m.texte) == 0)
                       {
-                        strcpy(reponse.data1, "0");
+                        strcpy(reponse.data1, "KO");
                         strcpy(reponse.texte, "Veuillez entrer un utilisateur et un mot de passe !\n");
                         reponse.type = m.expediteur;
                         reponse.expediteur = getpid();
@@ -229,7 +229,7 @@ int main()
                             fprintf(stderr, "INSERT OK\n");
                           }
 
-
+                          strcpy(reponse.data1, "OK");
                           strcpy(reponse.texte, "Utilisateur ajouté\n");
                           i = 0;
                           while (i < 6 && tab->connexions[i].pidFenetre != m.expediteur)
@@ -269,7 +269,7 @@ int main()
                         else
                         {
                           strcpy(reponse.texte, "L'Utilisateur existe déjà!\n");
-                          strcpy(reponse.data1, "0");
+                          strcpy(reponse.data1, "KO");
                         }
                       }
 
@@ -278,11 +278,11 @@ int main()
                         if (position == 0)
                         {
                           strcpy(reponse.texte, "L'Utilisateur inexistant!\n");
-                          strcpy(reponse.data1, "0");
+                          strcpy(reponse.data1, "KO");
                         }
                         else if (!verifieMotDePasse(position, m.texte))
                         {
-                          strcpy(reponse.data1, "0");
+                          strcpy(reponse.data1, "KO");
                           strcpy(reponse.texte, "Mot de passe incorrecte!\n");
                         }
                         else
@@ -298,7 +298,7 @@ int main()
                           if (!isFalse)
                           {
                             strcpy(tab->connexions[pos].nom, m.data2);
-                            strcpy(reponse.data1, "1");
+                            strcpy(reponse.data1, "OK");
                             strcpy(reponse.texte, "Vous êtes connectés!\n");
                             i = 0;
                             while (i < 6 && tab->connexions[i].pidFenetre != m.expediteur) i++;
@@ -335,7 +335,7 @@ int main()
 
                           else
                           {
-                            strcpy(reponse.data1, "0");
+                            strcpy(reponse.data1, "KO");
                             strcpy(reponse.texte, "L'Utilisateur est deja connecté\n");
                           }
                         }
