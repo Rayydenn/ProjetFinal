@@ -784,7 +784,7 @@ void handlerSIGUSR1(int sig)
                     }
                     else 
                     {
-                      fprintf(stderr, "(CLIENT %d) Inscription réussi\n", getpid());
+                      fprintf(stderr, "(CLIENT %d) Erreur de connexion\n", getpid());
                       w->dialogueErreur("Login...",m.texte);
                     }
 
