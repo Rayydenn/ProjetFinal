@@ -145,7 +145,6 @@ int main()
 
   while(1)
   {
-    bool isFalse = false;
     int temp = -1;
     int absent = 0;
     i = 0;
@@ -305,54 +304,42 @@ int main()
                             int i = 0;
                             while (i < 6 && tab->connexions[i].pidFenetre != m.expediteur) i++;
                             pos = i;
-                            i=0;
-                            while (i < 6 && tab->connexions[i].nom != m.data2) i++;
-                            if (i < 6 && strcmp(tab->connexions[i].nom, m.data2) == 0)
-                              isFalse = true;
 
-                            if (!isFalse)
+                            strcpy(tab->connexions[pos].nom, m.data2);
+                            strcpy(reponse.data1, "OK");
+                            strcpy(reponse.texte, "Vous êtes connectés!\n");
+                            i = 0;
+                            while (i < 6 && tab->connexions[i].pidFenetre != m.expediteur) i++;
+                            tab->connexions[i].nom[0] = '\0';
+                            strcpy(tab->connexions[i].nom, m.data2);
+
+                            for (int k = 0; k < 6;k++)
                             {
-                              strcpy(tab->connexions[pos].nom, m.data2);
-                              strcpy(reponse.data1, "OK");
-                              strcpy(reponse.texte, "Vous êtes connectés!\n");
-                              i = 0;
-                              while (i < 6 && tab->connexions[i].pidFenetre != m.expediteur) i++;
-                              tab->connexions[i].nom[0] = '\0';
-                              strcpy(tab->connexions[i].nom, m.data2);
-
-                              for (int k = 0; k < 6;k++)
+                              if (tab->connexions[k].pidFenetre != 0 && tab->connexions[k].pidFenetre != m.expediteur && strlen(tab->connexions[k].nom) > 0)
                               {
-                                if (tab->connexions[k].pidFenetre != 0 && tab->connexions[k].pidFenetre != m.expediteur && strlen(tab->connexions[k].nom) > 0)
-                                {
-                                  MESSAGE add;
-                                  add.type = tab->connexions[k].pidFenetre;
-                                  add.expediteur = getpid();
-                                  add.requete = ADD_USER;
-                                  strcpy(add.data1, m.data2); // Nouveau nom
-                                  msgsnd(idQ, &add, sizeof(MESSAGE) - sizeof(long), 0);
-                                  kill(tab->connexions[k].pidFenetre, SIGUSR1);
-                                }
-                              }
-                              for (int k = 0;k<6;k++)
-                              {
-                                if (tab->connexions[k].pidFenetre != 0; tab->connexions[k].pidFenetre != m.expediteur && strlen(tab->connexions[k].nom) > 0)
-                                {
-                                  MESSAGE add;
-                                  add.type = m.expediteur;
-                                  add.expediteur = getpid();
-                                  add.requete = ADD_USER;
-                                  strcpy(add.data1, tab->connexions[k].nom);
-                                  msgsnd(idQ, &add, sizeof(MESSAGE) - sizeof(long), 0);
-                                  kill(m.expediteur, SIGUSR1);
-                                }
+                                MESSAGE add;
+                                add.type = tab->connexions[k].pidFenetre;
+                                add.expediteur = getpid();
+                                add.requete = ADD_USER;
+                                strcpy(add.data1, m.data2); // Nouveau nom
+                                msgsnd(idQ, &add, sizeof(MESSAGE) - sizeof(long), 0);
+                                kill(tab->connexions[k].pidFenetre, SIGUSR1);
                               }
                             }
-
-                            else
+                            for (int k = 0;k<6;k++)
                             {
-                              strcpy(reponse.data1, "KO");
-                              strcpy(reponse.texte, "L'Utilisateur est deja connecté\n");
+                              if (tab->connexions[k].pidFenetre != 0; tab->connexions[k].pidFenetre != m.expediteur && strlen(tab->connexions[k].nom) > 0)
+                              {
+                                MESSAGE add;
+                                add.type = m.expediteur;
+                                add.expediteur = getpid();
+                                add.requete = ADD_USER;
+                                strcpy(add.data1, tab->connexions[k].nom);
+                                msgsnd(idQ, &add, sizeof(MESSAGE) - sizeof(long), 0);
+                                kill(m.expediteur, SIGUSR1);
+                              }
                             }
+                          
                           }
                         }
                       }
