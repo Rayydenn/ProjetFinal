@@ -773,11 +773,11 @@ void handlerSIGUSR1(int sig)
       switch(m.requete)
       {
         case LOGIN :
-                    timeOut = TIME_OUT;
-                    w->setTimeOut(timeOut);
-                    alarm(1);
                     if (strcmp(m.data1,"OK") == 0)
                     {
+                      timeOut = TIME_OUT;
+                      w->setTimeOut(timeOut);
+                      alarm(1);
                       fprintf(stderr,"(CLIENT %d) Login OK\n",getpid());
                       w->loginOK();
                       w->dialogueMessage("Login...",m.texte);
